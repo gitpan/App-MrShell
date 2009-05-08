@@ -8,8 +8,9 @@ use POSIX;
 use Config::Tiny;
 use POE qw( Wheel::Run );
 use Term::ANSIColor qw(:constants);
+use Text::Balanced;
 
-our $VERSION = '2.0000';
+our $VERSION = '2.0100';
 our @DEFAULT_SHELL_COMMAND = (ssh => '-o', 'BatchMode yes', '-o', 'StrictHostKeyChecking no', '-o', 'ConnectTimeout 20', '%h');
 
 # new {{{
@@ -23,9 +24,27 @@ sub new {
 # _process_space_delimited {{{
 sub _process_space_delimited {
     my $this = shift;
+    my $that = shift;
 
-    return
-        grep {defined} ($_[0] =~ m/["']([^"']*?)["']|(\S+)/g)
+    my @output;
+    while( $that ) {
+        if( $that =~ m/^\s*['"]/ ) {
+            my ($tok, $rem) = Text::Balanced::extract_delimited($that, qr(["']));
+
+            ($tok =~ s/^(['"])// and $tok =~ s/$1$//) or die "internal error processing space delimited";
+
+            push @output, $tok;
+            $that = $rem;
+
+        } else {
+            my ($tok, $rem) = split m/\s+/, $that, 2; 
+
+            push @output, $tok;
+            $that = $rem;
+        }
+    }
+
+    @output
 }
 # }}}
 # _process_hosts {{{
@@ -148,6 +167,15 @@ sub set_no_command_escapes_option {
 
     $this->{no_command_escapes} = 1;
     $this;
+}
+# }}}
+
+# groups {{{
+sub groups {
+    my $this = shift;
+
+    return unless $this->{groups};
+    return wantarray ? %{$this->{groups}} : $this->{groups};
 }
 # }}}
 
@@ -439,7 +467,7 @@ sub start_queue_on_host {
     );
 
     my $kid = POE::Wheel::Run->new(
-        Program     => [ $this->subst_cmd_vars(@{$this->{_shell_cmd}} => @$cmd) ],
+        Program     => [ my @debug_rq = ($this->subst_cmd_vars(@{$this->{_shell_cmd}} => @$cmd)) ],
         StdoutEvent => "child_stdout",
         StderrEvent => "child_stderr",
         CloseEvent  => "child_close",
