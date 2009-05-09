@@ -10,8 +10,8 @@ use POE qw( Wheel::Run );
 use Term::ANSIColor qw(:constants);
 use Text::Balanced;
 
-our $VERSION = '2.0100';
-our @DEFAULT_SHELL_COMMAND = (ssh => '-o', 'BatchMode yes', '-o', 'StrictHostKeyChecking no', '-o', 'ConnectTimeout 20', '%h');
+our $VERSION = '2.0200';
+our @DEFAULT_SHELL_COMMAND = (ssh => '-o', 'BatchMode yes', '-o', 'StrictHostKeyChecking no', '-o', 'ConnectTimeout 20', '[%u]-l', '[]%u', '%h');
 
 # new {{{
 sub new {
@@ -90,16 +90,49 @@ sub set_shell_command_option {
 # }}}
 # set_group_option {{{
 sub set_group_option {
-    my $this  = shift;
+    my $this   = shift;
+    my $groups = ($this->{groups} ||= {});
 
     my ($name, $value);
     while( ($name, $value) = splice @_, 0, 2 and $name and $value ) {
         if( ref($value) eq "ARRAY" ) {
-            $this->{groups}{$name} = [ @$value ]; # make a real copy
+            $groups->{$name} = [ @$value ]; # make a real copy
 
         } else {
-            $this->{groups}{$name} = [ $this->_process_space_delimited( $value ) ];
+            $groups->{$name} = [ $this->_process_space_delimited( $value ) ];
         }
+    }
+
+    my @groups = keys %{ $this->{groups} };
+    my $replace_limit = 30;
+    REPLACE_GROPUS: {
+        my $replaced = 0;
+
+        for my $group (@groups) {
+            my $hosts = $groups->{$group};
+
+            my $r = 0;
+            for(@$hosts) {
+                if( m/^@(.+)/ ) {
+                    if( my $g = $groups->{$1} ) {
+                        $_ = $g;
+
+                        $r ++;
+                    }
+                }
+            }
+
+            if( $r ) {
+                my %h;
+                @h{ map {ref $_ ? @$_ : $_} @$hosts } = ();
+                $groups->{$group} = [ keys %h ];
+                $replaced ++;
+            }
+        }
+
+        $replace_limit --;
+        last if $replace_limit < 1;
+        redo if $replaced;
     }
 
     $this;
@@ -413,15 +446,18 @@ sub subst_cmd_vars {
                 #  proovably true that I do.)
 
     if( $host =~ m/\b(?!<\\)!/ ) {
-        delete $h{'%h'};
         my @hosts = split '!', $host;
 
+        my @indexes_of_replacements;
         for(my $i=0; $i<@c; $i++) {
             if( $c[$i] eq '%h' ) {
                 splice @c, $i, 1, $hosts[0];
 
+                push @indexes_of_replacements, $i;
+
                 for my $h (reverse @hosts[1 .. $#hosts]) {
                     splice @c, $i+1, 0, @c[0 .. $i-1] => $h;
+                    push @indexes_of_replacements, $i+1 + $indexes_of_replacements[-1];
 
                     unless( $this->{no_command_escapes} ) {
                         for my $arg (@c[$i+1 .. $#c]) {
@@ -440,20 +476,45 @@ sub subst_cmd_vars {
             }
         }
 
+        my $beg = 0;
+        for my $i (@indexes_of_replacements) {
+            if( $c[$i] =~ s/^([\w.\-_]+)@// ) {
+                my $u = $1;
+                for(@c[$beg .. $i-1]) {
+                    s/^(\[\%u\]|\[\](?=\%u))//;
+                    $_ = $u if $_ eq '%u';
+                }
+
+            } else {
+                # NOTE: there's really no need to go through and remove [%u]
+                # conditional options, they'll automatically get nuked below
+                $c[$i] =~ s/\\@/@/g;
+            }
+            $beg = $i+1;
+        }
+
+        delete $h{'%h'};
+
     } else {
         $h{'%h'} =~ s/\\!/!/g;
     }
 
-    if( $this->{debug} ) {
-        my @cmd = map {exists $h{$_} ? $h{$_} : $_} @c;
-
-        my @dt = map {"<$_>"} @cmd;
-        $this->std_msg($host, $h{'%n'}, 0, BOLD.BLACK."DEBUG: exec(@dt)");
-
-        return @cmd;
+    if( $h{'%h'} ) {
+        $h{'%u'} = $1 if $h{'%h'} =~ s/^([\w.\-_]+)@//;
+        $h{'%h'} =~ s/\\@/@/g;
     }
 
-    map {exists $h{$_} ? $h{$_} : $_} @c;
+    @c = map {exists $h{$_} ? $h{$_} : $_}
+         map { m/^\[([^\[\]]+)\]/ ? ($h{$1} ? do{s/^\[\Q$1\E\]//; $_} : ()) : ($_) }
+         map { s/\[\]\%(\w+)/[\%$1]\%$1/; $_ }
+         @c;
+
+    if( $this->{debug} ) {
+        local $" = ")(";
+        $this->std_msg($host, $h{'%n'}, 0, BOLD.BLACK."DEBUG: exec(@c)");
+    }
+
+    @c;
 }
 # }}}
 # start_queue_on_host {{{

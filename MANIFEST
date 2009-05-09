@@ -1,6 +1,7 @@
 Changes
 lib/App/MrShell.pod
 Makefile.PL
+make_par.sh
 MANIFEST
 mrsh
 MrShell.pm
@@ -10,4 +11,6 @@ t/05_touch_things.t
 t/06_touch_things_w_mrsh.t
 t/07_host_routing_escapes.t
 t/07_host_routing.t
+t/09_simplest_usersubst.t
+t/10_routed_usersubst.t
 META.yml                                 Module meta-data (added by MakeMaker)
