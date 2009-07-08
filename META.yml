@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               App-MrShell
-version:            2.0203
+version:            2.0205
 abstract:           ~
 author:
     - Paul Miller <jettero@cpan.org>
@@ -22,7 +22,7 @@ no_index:
     directory:
         - t
         - inc
-generated_by:       ExtUtils::MakeMaker version 6.50
+generated_by:       ExtUtils::MakeMaker version 6.52
 meta-spec:
     url:      http://module-build.sourceforge.net/META-spec-v1.4.html
     version:  1.4
