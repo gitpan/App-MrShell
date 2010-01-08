@@ -10,7 +10,7 @@ use POE qw( Wheel::Run );
 use Term::ANSIColor qw(:constants);
 use Text::Balanced;
 
-our $VERSION = '2.0205';
+our $VERSION = '2.0207';
 our @DEFAULT_SHELL_COMMAND = (ssh => '-o', 'BatchMode yes', '-o', 'StrictHostKeyChecking no', '-o', 'ConnectTimeout 20', '[%u]-l', '[]%u', '%h');
 
 # new {{{
@@ -38,7 +38,7 @@ sub _process_space_delimited {
             $that = $rem;
 
         } else {
-            my ($tok, $rem) = split m/\s+/, $that, 2; 
+            my ($tok, $rem) = split ' ', $that, 2; 
 
             push @output, $tok;
             $that = $rem;
@@ -254,7 +254,7 @@ sub read_config {
     }
 
     if( my $c = $this->{_conf}{options}{'shell-command'} ) {
-        $this->set_shell_command_option( 1, $c );
+        $this->set_shell_command_option( $c );
     }
 
     if( my $c = $this->{_conf}{options}{'logfile'} ) {

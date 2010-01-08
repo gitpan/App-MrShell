@@ -286,7 +286,7 @@ be the problem.
 
     [options]
         default-hosts = @debian-desktops
-        shell-command = ssh -o 'BatchMode Yes'
+        shell-command = ssh -o 'BatchMode Yes' [%u]-l []%u %h
 
     [groups]
         debian-desktops = wisp corky razor
@@ -297,9 +297,13 @@ Paul Miller C<< <jettero@cpan.org >>
 
 L<http://github.com/jettero>
 
+=head1 THANKS
+
+Dennis Boone -- L<http://github.com/drboone>
+
 =head1 COPYRIGHT
 
-Copyright 2009 - Paul Miller
+Copyright 2009-2010 - Paul Miller
 
 Released as GPL, like the original Mr. Shell circa 1997.
 
